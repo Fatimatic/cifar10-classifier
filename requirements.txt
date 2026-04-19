@@ -1,6 +1,6 @@
 streamlit
-keras
-jax
+tensorflow-cpu==2.19.1
+keras==3.8.0
 numpy
 matplotlib
 Pillow
