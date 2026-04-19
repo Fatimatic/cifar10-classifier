@@ -2,8 +2,6 @@ import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
 from PIL import Image
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.datasets import fetch_openml
 import pickle
 import os
 
@@ -24,25 +22,23 @@ st.markdown("""
 
 @st.cache_resource(show_spinner=False)
 def load_model():
+    import pickle
+    import os
+    import urllib.request
+    import tarfile
+    import numpy as np
+    from sklearn.ensemble import RandomForestClassifier
+
     model_path = 'rf_model.pkl'
     if os.path.exists(model_path):
         with open(model_path, 'rb') as f:
             return pickle.load(f)
 
-    from sklearn.datasets import fetch_openml
-    import urllib.request
-    import pickle
-    import tarfile
-    import io
+    urllib.request.urlretrieve(
+        "https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz",
+        "cifar10.tar.gz"
+    )
 
-    # Download and load CIFAR-10 manually
-    url = "https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz"
-    st.info("Downloading CIFAR-10 dataset for training... please wait.")
-
-    import urllib.request
-    urllib.request.urlretrieve(url, "cifar10.tar.gz")
-
-    import tarfile
     with tarfile.open("cifar10.tar.gz", "r:gz") as tar:
         tar.extractall(".")
 
@@ -52,7 +48,7 @@ def load_model():
         return d[b'data'], d[b'labels']
 
     X_list, y_list = [], []
-    for i in range(1, 4):  # only 3 batches to keep it fast
+    for i in range(1, 4):
         X_b, y_b = load_batch(f'cifar-10-batches-py/data_batch_{i}')
         X_list.append(X_b)
         y_list.extend(y_b)
@@ -60,7 +56,6 @@ def load_model():
     X_train = np.vstack(X_list).astype('float32') / 255.0
     y_train = np.array(y_list)
 
-    st.info("Training model... please wait.")
     clf = RandomForestClassifier(n_estimators=50, n_jobs=-1, random_state=42)
     clf.fit(X_train, y_train)
 
@@ -156,7 +151,7 @@ with col2:
 
 with st.sidebar:
     st.markdown("### Model Info")
-    st.markdown("**Architecture:** CNN trained in Colab, served via Random Forest for deployment")
+    st.markdown("**CNN Architecture:** 3 Conv Blocks trained in Colab")
     st.markdown("**Dataset:** CIFAR-10 (60,000 images)")
     st.markdown("**Classes:**")
     for name in CLASS_NAMES:
