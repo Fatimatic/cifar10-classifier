@@ -1,5 +1,6 @@
 streamlit
 keras
+jax
 numpy
 matplotlib
 Pillow
