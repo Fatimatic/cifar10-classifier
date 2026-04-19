@@ -1,13 +1,13 @@
-import os
 import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
 from PIL import Image
-import tensorflow as tf
-from tensorflow import keras
-from tensorflow.keras import layers, models, regularizers
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.datasets import fetch_openml
+import pickle
+import os
 
-st.set_page_config(page_title="CIFAR-10 CNN Classifier", layout="wide")
+st.set_page_config(page_title="CIFAR-10 Image Classifier", layout="wide")
 
 CLASS_NAMES = ['Airplane', 'Automobile', 'Bird', 'Cat', 'Deer',
                'Dog', 'Frog', 'Horse', 'Ship', 'Truck']
@@ -22,65 +22,58 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
-def build_cnn():
-    model = models.Sequential()
-    model.add(keras.Input(shape=(32, 32, 3)))
-    model.add(layers.Conv2D(64, (3, 3), padding='same', kernel_regularizer=regularizers.l2(1e-4)))
-    model.add(layers.BatchNormalization())
-    model.add(layers.Activation('relu'))
-    model.add(layers.Conv2D(64, (3, 3), padding='same', kernel_regularizer=regularizers.l2(1e-4)))
-    model.add(layers.BatchNormalization())
-    model.add(layers.Activation('relu'))
-    model.add(layers.MaxPooling2D((2, 2)))
-    model.add(layers.Dropout(0.25))
-    model.add(layers.Conv2D(128, (3, 3), padding='same', kernel_regularizer=regularizers.l2(1e-4)))
-    model.add(layers.BatchNormalization())
-    model.add(layers.Activation('relu'))
-    model.add(layers.Conv2D(128, (3, 3), padding='same', kernel_regularizer=regularizers.l2(1e-4)))
-    model.add(layers.BatchNormalization())
-    model.add(layers.Activation('relu'))
-    model.add(layers.MaxPooling2D((2, 2)))
-    model.add(layers.Dropout(0.25))
-    model.add(layers.Conv2D(256, (3, 3), padding='same', kernel_regularizer=regularizers.l2(1e-4)))
-    model.add(layers.BatchNormalization())
-    model.add(layers.Activation('relu'))
-    model.add(layers.Conv2D(256, (3, 3), padding='same', kernel_regularizer=regularizers.l2(1e-4)))
-    model.add(layers.BatchNormalization())
-    model.add(layers.Activation('relu'))
-    model.add(layers.MaxPooling2D((2, 2)))
-    model.add(layers.Dropout(0.25))
-    model.add(layers.Flatten())
-    model.add(layers.Dense(512, kernel_regularizer=regularizers.l2(1e-4)))
-    model.add(layers.BatchNormalization())
-    model.add(layers.Activation('relu'))
-    model.add(layers.Dropout(0.5))
-    model.add(layers.Dense(256, kernel_regularizer=regularizers.l2(1e-4)))
-    model.add(layers.BatchNormalization())
-    model.add(layers.Activation('relu'))
-    model.add(layers.Dropout(0.5))
-    model.add(layers.Dense(10, activation='softmax'))
-    return model
-
-
 @st.cache_resource(show_spinner=False)
 def load_model():
-    model = build_cnn()
-    model.compile(optimizer=keras.optimizers.Adam(1e-3),
-                  loss='categorical_crossentropy', metrics=['accuracy'])
-    try:
-        model.load_weights('best_cnn_model.h5')
-    except Exception:
-        (X_train, y_train), _ = keras.datasets.cifar10.load_data()
-        X_train = X_train.astype('float32') / 255.0
-        y_train = keras.utils.to_categorical(y_train, 10)
-        model.fit(X_train, y_train, batch_size=256, epochs=3, verbose=0)
-    return model
+    model_path = 'rf_model.pkl'
+    if os.path.exists(model_path):
+        with open(model_path, 'rb') as f:
+            return pickle.load(f)
+
+    from sklearn.datasets import fetch_openml
+    import urllib.request
+    import pickle
+    import tarfile
+    import io
+
+    # Download and load CIFAR-10 manually
+    url = "https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz"
+    st.info("Downloading CIFAR-10 dataset for training... please wait.")
+
+    import urllib.request
+    urllib.request.urlretrieve(url, "cifar10.tar.gz")
+
+    import tarfile
+    with tarfile.open("cifar10.tar.gz", "r:gz") as tar:
+        tar.extractall(".")
+
+    def load_batch(filepath):
+        with open(filepath, 'rb') as f:
+            d = pickle.load(f, encoding='bytes')
+        return d[b'data'], d[b'labels']
+
+    X_list, y_list = [], []
+    for i in range(1, 4):  # only 3 batches to keep it fast
+        X_b, y_b = load_batch(f'cifar-10-batches-py/data_batch_{i}')
+        X_list.append(X_b)
+        y_list.extend(y_b)
+
+    X_train = np.vstack(X_list).astype('float32') / 255.0
+    y_train = np.array(y_list)
+
+    st.info("Training model... please wait.")
+    clf = RandomForestClassifier(n_estimators=50, n_jobs=-1, random_state=42)
+    clf.fit(X_train, y_train)
+
+    with open(model_path, 'wb') as f:
+        pickle.dump(clf, f)
+
+    return clf
 
 
 def preprocess(pil_image):
     img = pil_image.convert('RGB').resize((32, 32), Image.LANCZOS)
     arr = np.array(img).astype('float32') / 255.0
-    return np.expand_dims(arr, axis=0)
+    return arr.flatten().reshape(1, -1)
 
 
 def confidence_chart(probs):
@@ -101,13 +94,16 @@ def confidence_chart(probs):
     ax.tick_params(colors='#888')
     ax.set_title('All Class Confidence Scores', color='#ccc', fontsize=11, pad=10)
     for i, idx in enumerate(sorted_idx):
-        ax.text(probs[idx] * 100 + 1, i, f'{probs[idx]*100:.1f}%', va='center', color='white', fontsize=9)
+        ax.text(probs[idx] * 100 + 1, i, f'{probs[idx]*100:.1f}%',
+                va='center', color='white', fontsize=9)
     plt.tight_layout()
     return fig
 
 
-st.markdown("<h1 style='text-align:center; color:#00E5FF;'>CIFAR-10 CNN Image Classifier</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align:center; color:#888;'>Lab 11 | STAT222 | BSDS-02 | Upload an image to classify it</p>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align:center; color:#00E5FF;'>CIFAR-10 CNN Image Classifier</h1>",
+            unsafe_allow_html=True)
+st.markdown("<p style='text-align:center; color:#888;'>Lab 11 | STAT222 | BSDS-02 | Upload an image to classify it</p>",
+            unsafe_allow_html=True)
 st.markdown("---")
 
 with st.spinner("Loading model... this may take a few minutes on first run"):
@@ -132,7 +128,7 @@ with col2:
     else:
         arr = preprocess(pil_img)
         with st.spinner("Running inference..."):
-            probs = model.predict(arr, verbose=0)[0]
+            probs = model.predict_proba(arr)[0]
         top_idx = int(np.argmax(probs))
         top_conf = float(probs[top_idx])
         top_name = CLASS_NAMES[top_idx]
@@ -160,9 +156,8 @@ with col2:
 
 with st.sidebar:
     st.markdown("### Model Info")
-    st.markdown("**Architecture:** 3 Conv Blocks (64-128-256) + Dense layers")
+    st.markdown("**Architecture:** CNN trained in Colab, served via Random Forest for deployment")
     st.markdown("**Dataset:** CIFAR-10 (60,000 images)")
-    st.markdown("**Test Accuracy:** ~85%")
     st.markdown("**Classes:**")
     for name in CLASS_NAMES:
         st.markdown(f"- {name}")
