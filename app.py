@@ -1,16 +1,12 @@
 import os
-os.environ["KERAS_BACKEND"] = "jax"
-
 import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
 from PIL import Image
-os.environ["KERAS_BACKEND"] = "jax"
 import keras
 from keras import layers, models, regularizers
-import time
 
-st.set_page_config(page_title="CIFAR-10 CNN Classifier", page_icon="", layout="wide")
+st.set_page_config(page_title="CIFAR-10 CNN Classifier", layout="wide")
 
 CLASS_NAMES = ['Airplane', 'Automobile', 'Bird', 'Cat', 'Deer',
                'Dog', 'Frog', 'Horse', 'Ship', 'Truck']
@@ -18,53 +14,55 @@ NUM_CLASSES = 10
 
 st.markdown("""
 <style>
-    .main-title { font-size: 2.2rem; font-weight: 700; text-align: center; color: #00E5FF; }
-    .pred-box { background: #1a1a2e; border-radius: 16px; padding: 2rem; text-align: center; }
-    .pred-label { font-size: 2rem; font-weight: 700; color: #ffffff; }
-    .conf-num { font-size: 3rem; font-weight: 700; color: #00E5FF; }
+.pred-box { background: #1a1a2e; border-radius: 16px; padding: 2rem; text-align: center; }
+.pred-label { font-size: 2rem; font-weight: 700; color: #ffffff; }
+.conf-num { font-size: 3rem; font-weight: 700; color: #00E5FF; }
 </style>
 """, unsafe_allow_html=True)
 
+
+def build_cnn():
+    model = models.Sequential()
+    model.add(keras.Input(shape=(32, 32, 3)))
+    model.add(layers.Conv2D(64, (3, 3), padding='same', kernel_regularizer=regularizers.l2(1e-4)))
+    model.add(layers.BatchNormalization())
+    model.add(layers.Activation('relu'))
+    model.add(layers.Conv2D(64, (3, 3), padding='same', kernel_regularizer=regularizers.l2(1e-4)))
+    model.add(layers.BatchNormalization())
+    model.add(layers.Activation('relu'))
+    model.add(layers.MaxPooling2D((2, 2)))
+    model.add(layers.Dropout(0.25))
+    model.add(layers.Conv2D(128, (3, 3), padding='same', kernel_regularizer=regularizers.l2(1e-4)))
+    model.add(layers.BatchNormalization())
+    model.add(layers.Activation('relu'))
+    model.add(layers.Conv2D(128, (3, 3), padding='same', kernel_regularizer=regularizers.l2(1e-4)))
+    model.add(layers.BatchNormalization())
+    model.add(layers.Activation('relu'))
+    model.add(layers.MaxPooling2D((2, 2)))
+    model.add(layers.Dropout(0.25))
+    model.add(layers.Conv2D(256, (3, 3), padding='same', kernel_regularizer=regularizers.l2(1e-4)))
+    model.add(layers.BatchNormalization())
+    model.add(layers.Activation('relu'))
+    model.add(layers.Conv2D(256, (3, 3), padding='same', kernel_regularizer=regularizers.l2(1e-4)))
+    model.add(layers.BatchNormalization())
+    model.add(layers.Activation('relu'))
+    model.add(layers.MaxPooling2D((2, 2)))
+    model.add(layers.Dropout(0.25))
+    model.add(layers.Flatten())
+    model.add(layers.Dense(512, kernel_regularizer=regularizers.l2(1e-4)))
+    model.add(layers.BatchNormalization())
+    model.add(layers.Activation('relu'))
+    model.add(layers.Dropout(0.5))
+    model.add(layers.Dense(256, kernel_regularizer=regularizers.l2(1e-4)))
+    model.add(layers.BatchNormalization())
+    model.add(layers.Activation('relu'))
+    model.add(layers.Dropout(0.5))
+    model.add(layers.Dense(10, activation='softmax'))
+    return model
+
+
 @st.cache_resource(show_spinner=False)
 def load_model():
-    def build_cnn():
-        model = models.Sequential()
-        model.add(layers.Conv2D(64, (3,3), padding='same', kernel_regularizer=regularizers.l2(1e-4), input_shape=(32,32,3)))
-        model.add(layers.BatchNormalization())
-        model.add(layers.Activation('relu'))
-        model.add(layers.Conv2D(64, (3,3), padding='same', kernel_regularizer=regularizers.l2(1e-4)))
-        model.add(layers.BatchNormalization())
-        model.add(layers.Activation('relu'))
-        model.add(layers.MaxPooling2D((2,2)))
-        model.add(layers.Dropout(0.25))
-        model.add(layers.Conv2D(128, (3,3), padding='same', kernel_regularizer=regularizers.l2(1e-4)))
-        model.add(layers.BatchNormalization())
-        model.add(layers.Activation('relu'))
-        model.add(layers.Conv2D(128, (3,3), padding='same', kernel_regularizer=regularizers.l2(1e-4)))
-        model.add(layers.BatchNormalization())
-        model.add(layers.Activation('relu'))
-        model.add(layers.MaxPooling2D((2,2)))
-        model.add(layers.Dropout(0.25))
-        model.add(layers.Conv2D(256, (3,3), padding='same', kernel_regularizer=regularizers.l2(1e-4)))
-        model.add(layers.BatchNormalization())
-        model.add(layers.Activation('relu'))
-        model.add(layers.Conv2D(256, (3,3), padding='same', kernel_regularizer=regularizers.l2(1e-4)))
-        model.add(layers.BatchNormalization())
-        model.add(layers.Activation('relu'))
-        model.add(layers.MaxPooling2D((2,2)))
-        model.add(layers.Dropout(0.25))
-        model.add(layers.Flatten())
-        model.add(layers.Dense(512, kernel_regularizer=regularizers.l2(1e-4)))
-        model.add(layers.BatchNormalization())
-        model.add(layers.Activation('relu'))
-        model.add(layers.Dropout(0.5))
-        model.add(layers.Dense(256, kernel_regularizer=regularizers.l2(1e-4)))
-        model.add(layers.BatchNormalization())
-        model.add(layers.Activation('relu'))
-        model.add(layers.Dropout(0.5))
-        model.add(layers.Dense(10, activation='softmax'))
-        return model
-
     model = build_cnn()
     model.compile(optimizer=keras.optimizers.Adam(1e-3),
                   loss='categorical_crossentropy', metrics=['accuracy'])
@@ -77,14 +75,12 @@ def load_model():
         model.fit(X_train, y_train, batch_size=256, epochs=3, verbose=0)
     return model
 
-with st.spinner("Loading model..."):
-    model = load_model()
-st.success("Model loaded successfully.")
 
 def preprocess(pil_image):
     img = pil_image.convert('RGB').resize((32, 32), Image.LANCZOS)
     arr = np.array(img).astype('float32') / 255.0
     return np.expand_dims(arr, axis=0)
+
 
 def confidence_chart(probs):
     fig, ax = plt.subplots(figsize=(7, 4))
@@ -104,23 +100,28 @@ def confidence_chart(probs):
     ax.tick_params(colors='#888')
     ax.set_title('All Class Confidence Scores', color='#ccc', fontsize=11, pad=10)
     for i, idx in enumerate(sorted_idx):
-        ax.text(probs[idx]*100 + 1, i, f'{probs[idx]*100:.1f}%', va='center', color='white', fontsize=9)
+        ax.text(probs[idx] * 100 + 1, i, f'{probs[idx]*100:.1f}%', va='center', color='white', fontsize=9)
     plt.tight_layout()
     return fig
 
-st.markdown("<h1 class='main-title'>CIFAR-10 CNN Image Classifier</h1>", unsafe_allow_html=True)
+
+st.markdown("<h1 style='text-align:center; color:#00E5FF;'>CIFAR-10 CNN Image Classifier</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align:center; color:#888;'>Lab 11 | STAT222 | BSDS-02 | Upload an image to classify it</p>", unsafe_allow_html=True)
 st.markdown("---")
+
+with st.spinner("Loading model... this may take a few minutes on first run"):
+    model = load_model()
+st.success("Model ready.")
 
 col1, col2 = st.columns([1, 1.4], gap="large")
 
 with col1:
     st.markdown("### Upload Image")
-    uploaded = st.file_uploader("Choose an image", type=["jpg","jpeg","png","webp","bmp"])
+    uploaded = st.file_uploader("Choose an image", type=["jpg", "jpeg", "png", "webp", "bmp"])
     if uploaded:
         pil_img = Image.open(uploaded)
         st.image(pil_img, caption="Uploaded image", use_column_width=True)
-        small = pil_img.convert('RGB').resize((32,32))
+        small = pil_img.convert('RGB').resize((32, 32))
         st.image(small, caption="What model sees (32x32)", width=120)
 
 with col2:
@@ -148,7 +149,7 @@ with col2:
         st.markdown("**Top 3 Predictions**")
         top3 = np.argsort(probs)[::-1][:3]
         c1, c2, c3 = st.columns(3)
-        for col, idx, medal in zip([c1,c2,c3], top3, ["#1","#2","#3"]):
+        for col, idx, medal in zip([c1, c2, c3], top3, ["#1", "#2", "#3"]):
             col.metric(medal, CLASS_NAMES[idx], f"{probs[idx]*100:.1f}%")
 
         st.markdown("---")
