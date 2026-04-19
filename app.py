@@ -1,11 +1,13 @@
+import os
+os.environ["KERAS_BACKEND"] = "jax"
 
 import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
 from PIL import Image
-import tensorflow as tf
-from tensorflow import keras
-from tensorflow.keras import layers, models, regularizers
+os.environ["KERAS_BACKEND"] = "jax"
+import keras
+from keras import layers, models, regularizers
 import time
 
 st.set_page_config(page_title="CIFAR-10 CNN Classifier", page_icon="", layout="wide")
