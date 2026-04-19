@@ -3,8 +3,9 @@ import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
 from PIL import Image
-import keras
-from keras import layers, models, regularizers
+import tensorflow as tf
+from tensorflow import keras
+from tensorflow.keras import layers, models, regularizers
 
 st.set_page_config(page_title="CIFAR-10 CNN Classifier", layout="wide")
 
