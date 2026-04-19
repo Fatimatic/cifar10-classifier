@@ -37,7 +37,6 @@ def load_model():
         model.add(layers.Activation('relu'))
         model.add(layers.MaxPooling2D((2,2)))
         model.add(layers.Dropout(0.25))
-
         model.add(layers.Conv2D(128, (3,3), padding='same', kernel_regularizer=regularizers.l2(1e-4)))
         model.add(layers.BatchNormalization())
         model.add(layers.Activation('relu'))
@@ -46,7 +45,6 @@ def load_model():
         model.add(layers.Activation('relu'))
         model.add(layers.MaxPooling2D((2,2)))
         model.add(layers.Dropout(0.25))
-
         model.add(layers.Conv2D(256, (3,3), padding='same', kernel_regularizer=regularizers.l2(1e-4)))
         model.add(layers.BatchNormalization())
         model.add(layers.Activation('relu'))
@@ -55,7 +53,6 @@ def load_model():
         model.add(layers.Activation('relu'))
         model.add(layers.MaxPooling2D((2,2)))
         model.add(layers.Dropout(0.25))
-
         model.add(layers.Flatten())
         model.add(layers.Dense(512, kernel_regularizer=regularizers.l2(1e-4)))
         model.add(layers.BatchNormalization())
@@ -71,7 +68,7 @@ def load_model():
     model = build_cnn()
     model.compile(optimizer=keras.optimizers.Adam(1e-3),
                   loss='categorical_crossentropy', metrics=['accuracy'])
-  try:
+    try:
         model.load_weights('best_cnn_model.h5')
     except Exception:
         (X_train, y_train), _ = keras.datasets.cifar10.load_data()
